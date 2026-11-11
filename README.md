@@ -3,6 +3,7 @@
 **Corazón** is a bilingual (Spanish/English) AI-powered resource platform for Latino communities in the U.S. It helps users find trusted local organizations, understand official documents, and get guidance — in their language, for their situation.
 
 Built at **WildHacks 2026** in 36 hours by a team of Hispanic CS students from UIC.
+<img width="2940" height="1620" alt="image" src="https://github.com/user-attachments/assets/46eecc3e-8251-455e-b525-6be44e490b7a" />
 
 ---
 
