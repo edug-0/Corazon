@@ -1,6 +1,7 @@
 # Corazón
 
-> Team project built at WildHacks 2026 (Northwestern) with [Nicolas Rufino](https://github.com/nicolasrufino) and [Diego](https://github.com/dflow11). Original repo: [nicolasrufino/Corazon](https://github.com/nicolasrufino/Corazon).>
+> Team project built at WildHacks 2026 (Northwestern) with [Nicolas Rufino](https://github.com/nicolasrufino) and [Diego](https://github.com/dflow11). Original repo: [nicolasrufino/Corazon](https://github.com/nicolasrufino/Corazon).
+>
 > My role: system architect and AI/ML lead.
 
 ![Corazón landing page, "For Latinos, by Latinos", with the English and Spanish toggle](docs/readme/landing-page.png)
