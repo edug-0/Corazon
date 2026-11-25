@@ -1,0 +1,197 @@
+# Corazón — Hispanic at Heart
+
+**Corazón** is a bilingual (Spanish/English) AI-powered resource platform for Latino communities in the U.S. It helps users find trusted local organizations, understand official documents, and get guidance — in their language, for their situation.
+
+Built at **WildHacks 2026** in 36 hours by a team of Hispanic CS students from UIC.
+<img width="2940" height="1620" alt="image" src="https://github.com/user-attachments/assets/46eecc3e-8251-455e-b525-6be44e490b7a" />
+
+---
+
+## What it does
+
+Corazón gives Latino users a personalized dashboard of local resources — legal aid, health clinics, immigration help, food banks — filtered to their city and situation. A community finder lets them search and browse trusted Latino organizations across Chicago. The document analyzer takes a photo or PDF of any official letter (lease, benefits notice, court summons) and returns a plain-language explanation in Spanish or English. A voice chat assistant, powered by Claude, answers questions hands-free using the browser's built-in microphone. Everything is bilingual, culturally designed, and built around real needs we've heard from our own families — not hypothetical users.
+
+---
+
+## Tech stack
+
+| Layer           | Technology                     | Purpose                                     |
+| --------------- | ------------------------------ | ------------------------------------------- |
+| Frontend        | React + TypeScript + Vite      | UI and routing                              |
+| Styling         | Tailwind CSS                   | Design system with Latin cultural tokens    |
+| Font            | Belgrano (Google Fonts)        | Cultural typography                         |
+| Auth + DB       | Supabase                       | User profiles, authentication, file storage |
+| Org data        | Supabase Postgres              | Scraped Latino org/resource data            |
+| Backend         | FastAPI (Python)               | API layer, AI proxy, data endpoints         |
+| AI model        | Claude Sonnet 4 via OpenRouter | Resource recs, doc analysis, voice chat     |
+| Voice input     | Web Speech API                 | Browser-native speech-to-text               |
+| Frontend deploy | Vercel                         | Live frontend                               |
+| Backend deploy  | Railway                        | Live backend                                |
+| Scraper         | Python + BeautifulSoup         | Populates Supabase resource tables          |
+
+---
+
+## How the pieces connect
+
+The frontend talks to our FastAPI backend for anything AI or data-related. Auth and user profiles go directly to Supabase. Org data lives in Supabase, populated by Diego's scraper. The backend is the only thing that ever touches OpenRouter — the frontend never calls AI APIs directly.
+
+```
+User browser
+  → React frontend (Vercel)
+    → FastAPI backend (Railway)
+      → OpenRouter → Claude Sonnet 4
+
+Python scraper (Diego's repo)
+  → Supabase (resources table)
+    → FastAPI GET /api/resources
+      → React frontend
+
+React frontend
+  → Supabase (auth + user profiles + file storage)
+```
+
+---
+
+## Repo structure
+
+```
+/
+├── src/
+│   ├── pages/          # One file per route (Auth, Onboarding, Dashboard, Community, Analyzer)
+│   ├── components/     # Shared UI components (LayoutShell, ResourceCard, VoiceAssistant, etc.)
+│   ├── context/        # AppContext — global state (user, language, saved resources, history)
+│   ├── lib/            # supabase.ts client, utils, mockApi (dev only)
+│   ├── config/         # env.ts — single source for all env variable access
+│   ├── data/           # mockData.ts — placeholder data until backend is live
+│   └── types/          # app.ts — shared TypeScript types
+├── backend/
+│   ├── main.py         # FastAPI app entry point, CORS config, router registration
+│   ├── routers/        # ai.py, users.py, resources.py, documents.py
+│   ├── database.py     # Supabase client initialization
+│   ├── requirements.txt
+│   └── Procfile        # Railway deploy command
+├── keys/
+│   └── keys.md         # LOCAL ONLY — never committed. Store all real keys here.
+└── .env.example        # Template showing all required env vars (no real values)
+```
+
+---
+
+## Environment setup
+
+### Step 1 — Clone and install
+
+```bash
+git clone https://github.com/nicolasrufino/Corazon--hispanic-at-heart
+cd Corazon--hispanic-at-heart
+npm install
+```
+
+### Step 2 — Get the keys
+
+Ask a teammate for the values in `keys/keys.md`. You need:
+
+- **Supabase URL + keys** — supabase.com → your project → Settings → API (frontend uses anon key, backend uses service role key)
+- **OpenRouter API key** — openrouter.ai/keys
+
+### Step 3 — Create your local env files
+
+```bash
+cp .env.example .env.local
+cp backend/.env.example backend/.env
+```
+
+Then open each file and paste in the real keys from `keys/keys.md`.
+
+### Step 3.5 - Apply Supabase resources schema
+
+In Supabase SQL Editor, run the SQL in `backend/supabase/resources_schema.sql`.
+
+This creates the `public.resources` table used by `GET /api/resources` and inserts sample rows.
+
+### Step 4 — Run the frontend
+
+```bash
+npm run dev
+```
+
+Opens at `http://localhost:5173`
+
+### Step 5 — Run the backend
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+Runs at `http://localhost:8000`. API docs (auto-generated by FastAPI) at `http://localhost:8000/docs`
+
+---
+
+## How the AI side works (Eddie's domain)
+
+All AI calls go through the FastAPI backend — the frontend never calls OpenRouter directly. This keeps our API key server-side and lets us control prompts, add context, and log usage in one place. The backend uses the `openai` Python SDK pointed at `https://openrouter.ai/api/v1` with `model="anthropic/claude-sonnet-4"`.
+
+There are three AI endpoints in `backend/routers/ai.py`. `POST /api/ai/recommend` takes a user's onboarding profile (city, situation, language preference) and returns a ranked list of relevant orgs. `POST /api/ai/chat` takes a message and conversation history and streams back a Claude response — this is what powers the voice assistant. `POST /api/ai/analyze-document` takes extracted text from an uploaded file and returns a plain-language explanation in the user's preferred language.
+
+Voice chat uses the browser's built-in Web Speech API (`window.SpeechRecognition`) to convert microphone input to text, then sends the transcript to `/api/ai/chat` like any other message. The voice component lives in `src/components/VoiceAssistant.tsx`. The system prompt, persona, and all custom logic for each endpoint live in `backend/routers/ai.py` — **Eddie owns this file**.
+
+---
+
+## How the scraper connects (Diego's domain)
+
+Diego runs a separate Python scraper repo that targets Chicago Latino org directories: 211.org, Enlace Chicago, Casa Central, LUCHA, UIC LARES, and Illinois Legal Aid Online. It pulls org names, addresses, phone numbers, service categories, languages served, and eligibility requirements, then normalizes everything into a consistent shape.
+
+Each org gets stored in Supabase in a resources table with this structure:
+
+```json
+{
+  "name": "",
+  "category": "",
+  "address": "",
+  "phone": "",
+  "languages": [],
+  "eligibility": [],
+  "source_url": "",
+  "scraped_at": ""
+}
+```
+
+The scraper pushes directly to Supabase using `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`. The FastAPI endpoint `GET /api/resources` queries that table and returns filtered org cards to the frontend. To run the scraper: clone Diego's repo, add the Supabase env vars to its `.env`, and run `python scraper.py`. **Diego owns `backend/routers/resources.py`, `backend/database.py`, and the scraper repo.**
+
+---
+
+## Code quality
+
+ESLint + Prettier run automatically on every commit via a Husky pre-commit hook — so nothing gets merged with formatting issues or lint errors.
+
+```bash
+npm run lint      # check for lint errors
+npm run lint:fix  # auto-fix lint errors
+npm run format    # format all src files with Prettier
+```
+
+If you're using VS Code, install the recommended extensions when prompted (Prettier, ESLint, Tailwind CSS IntelliSense) and it will auto-format on save.
+
+---
+
+## Deployment
+
+| Service  | What it hosts                | How to deploy                                                                                             |
+| -------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Vercel   | React frontend               | Auto-deploys on every push to `main`. Add env vars in Vercel dashboard → Settings → Environment Variables |
+| Railway  | FastAPI backend              | Auto-deploys from `/backend` folder. Add env vars in Railway dashboard → Variables                        |
+| Supabase | Postgres DB + Auth + Storage | Managed — no deploy needed. Schema changes go in Supabase SQL editor                                      |
+
+---
+
+## Team
+
+- **Eddie** — AI integration lead (Claude prompts, resource logic, document analyzer, voice chat)
+- **Nicolas** — Frontend + full-stack (React pages, Tailwind design system, Vercel deploy)
+- **Diego** — Backend + data (FastAPI endpoints, Supabase schema, scraper, Railway deploy)
+
+---
+
+_Built with love for our community. De latinos para latinos._
